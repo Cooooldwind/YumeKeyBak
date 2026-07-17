@@ -1,3 +1,11 @@
+Edit ver. by CooooldWind with TRAE:
+
+Remove .sh file & add build.bat to run on Windows.
+
+Update minhook.
+
+Download MingW64 and run build.bat.
+
 === YumeKey 3 Release ===
 
 YumeKey 3 (codename: Obsidian) disables activation requirements for Synthesizer V Studio Pro
