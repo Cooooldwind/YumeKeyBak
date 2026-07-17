@@ -28,7 +28,8 @@
 
 #include <windows.h>
 
-#ifdef _MSC_VER
+#if defined(_MSC_VER) && !defined(MINHOOK_DISABLE_INTRINSICS)
+    #define ALLOW_INTRINSICS
     #include <intrin.h>
 #endif
 
@@ -48,8 +49,6 @@
 
 #include "trampoline.h"
 #include "buffer.h"
-
-#include "../include/MinHook.h"
 
 // Maximum size of a trampoline function.
 #if defined(_M_X64) || defined(__x86_64__)
@@ -138,7 +137,7 @@ BOOL CreateTrampolineFunction(PTRAMPOLINE ct)
 #if defined(_M_X64) || defined(__x86_64__)
             jmp.address = pOldInst;
 #else
-            jmp.operand = (UINT32)(pOldInst - (pNewInst + sizeof(jmp)));
+            jmp.operand = (INT32)(pOldInst - (pNewInst + sizeof(jmp)));
 #endif
             pCopySrc = &jmp;
             copySize = sizeof(jmp);
@@ -153,9 +152,9 @@ BOOL CreateTrampolineFunction(PTRAMPOLINE ct)
             // Modify the RIP relative address.
             PUINT32 pRelAddr;
 
-            // Avoid using safe_memcpy to reduce the footprint.
-#ifndef _MSC_VER
-            safe_memcpy(instBuf, (LPBYTE)pOldInst, copySize);
+            // Avoid using memcpy to reduce the footprint.
+#ifndef ALLOW_INTRINSICS
+            memcpy(instBuf, (LPBYTE)pOldInst, copySize);
 #else
             __movsb(instBuf, (LPBYTE)pOldInst, copySize);
 #endif
@@ -178,7 +177,7 @@ BOOL CreateTrampolineFunction(PTRAMPOLINE ct)
 #if defined(_M_X64) || defined(__x86_64__)
             call.address = dest;
 #else
-            call.operand = (UINT32)(dest - (pNewInst + sizeof(call)));
+            call.operand = (INT32)(dest - (pNewInst + sizeof(call)));
 #endif
             pCopySrc = &call;
             copySize = sizeof(call);
@@ -205,7 +204,7 @@ BOOL CreateTrampolineFunction(PTRAMPOLINE ct)
 #if defined(_M_X64) || defined(__x86_64__)
                 jmp.address = dest;
 #else
-                jmp.operand = (UINT32)(dest - (pNewInst + sizeof(jmp)));
+                jmp.operand = (INT32)(dest - (pNewInst + sizeof(jmp)));
 #endif
                 pCopySrc = &jmp;
                 copySize = sizeof(jmp);
@@ -248,7 +247,7 @@ BOOL CreateTrampolineFunction(PTRAMPOLINE ct)
                 jcc.address = dest;
 #else
                 jcc.opcode1 = 0x80 | cond;
-                jcc.operand = (UINT32)(dest - (pNewInst + sizeof(jcc)));
+                jcc.operand = (INT32)(dest - (pNewInst + sizeof(jcc)));
 #endif
                 pCopySrc = &jcc;
                 copySize = sizeof(jcc);
@@ -278,16 +277,15 @@ BOOL CreateTrampolineFunction(PTRAMPOLINE ct)
         ct->newIPs[ct->nIP] = newPos;
         ct->nIP++;
 
-        // Avoid using safe_memcpy to reduce the footprint.
-#ifndef _MSC_VER
-        safe_memcpy((LPBYTE)ct->pTrampoline + newPos, pCopySrc, copySize);
+        // Avoid using memcpy to reduce the footprint.
+#ifndef ALLOW_INTRINSICS
+        memcpy((LPBYTE)ct->pTrampoline + newPos, pCopySrc, copySize);
 #else
         __movsb((LPBYTE)ct->pTrampoline + newPos, (LPBYTE)pCopySrc, copySize);
 #endif
         newPos += copySize;
         oldPos += hs.len;
-    }
-    while (!finished);
+    } while (!finished);
 
     // Is there enough place for a long jump?
     if (oldPos < sizeof(JMP_REL)
@@ -315,7 +313,7 @@ BOOL CreateTrampolineFunction(PTRAMPOLINE ct)
     jmp.address = (ULONG_PTR)ct->pDetour;
 
     ct->pRelay = (LPBYTE)ct->pTrampoline + newPos;
-    safe_memcpy(ct->pRelay, &jmp, sizeof(jmp));
+    memcpy(ct->pRelay, &jmp, sizeof(jmp));
 #endif
 
     return TRUE;
